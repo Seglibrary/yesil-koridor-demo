@@ -1,0 +1,810 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ambulans Koridoru · Trafik Laboratuvarı</title>
+<style>
+:root{--bg:#14171c;--panel:rgba(18,21,26,.94);--text:#eef1f5;--muted:#a9b1bd;--green:#3ddc97;--red:#ff5a5f;--amber:#f5b942;--blue:#4f9dff;--teal:#2fd3c7;--line:#2f3540}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;overflow:hidden}
+canvas{display:block;width:100vw;height:100vh;cursor:crosshair}
+.hidden{display:none!important}
+button{font:inherit;color:inherit;cursor:pointer;border:1px solid var(--line);background:#1f242c;border-radius:10px;padding:10px 16px;font-size:17px}
+button:hover{background:#272d37}
+button.primary{background:var(--green);color:#0d1a14;border-color:var(--green);font-weight:700}
+button.primary:hover{filter:brightness(1.07)}
+button.on{background:#e9edf2;color:#14171c;border-color:#e9edf2;font-weight:700}
+/* HUD */
+#hud{position:fixed;top:18px;left:18px;display:flex;gap:14px;align-items:stretch;pointer-events:none}
+.badge{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 20px;display:flex;gap:16px;align-items:center}
+.badge .num{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:24px}
+.badge .title{font-size:30px;font-weight:800;letter-spacing:.5px}
+.badge .sub{font-size:16px;color:var(--muted);margin-top:2px;max-width:420px}
+.stats{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 18px;display:flex;gap:26px;align-items:center}
+.stats div{display:flex;flex-direction:column;align-items:flex-start}
+.stats b{font-size:30px;font-variant-numeric:tabular-nums;font-weight:800}
+.stats span{font-size:14px;color:var(--muted)}
+#ctrl{position:fixed;top:18px;right:18px;display:flex;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:8px}
+#ctrl button{padding:8px 14px;font-size:16px}
+#legend{position:fixed;left:18px;bottom:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px;display:flex;gap:18px;font-size:15px;color:var(--muted);flex-wrap:wrap;max-width:calc(100vw - 36px)}
+#legend .it{display:flex;align-items:center;gap:8px}
+#legend i{display:inline-block;width:20px;height:10px;border-radius:3px}
+#legend .tag{font-weight:800;font-style:normal;padding:0 6px;border-radius:5px;font-size:14px}
+#note{position:fixed;right:18px;bottom:16px;font-size:13px;color:#7f8896}
+/* Setup panel */
+#setup{position:fixed;top:18px;left:18px;width:360px;max-height:calc(100vh - 90px);overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px}
+#setup h1{margin:0 0 6px;font-size:28px;line-height:1.15}
+#setup p.lead{margin:0 0 18px;color:var(--muted);font-size:16px;line-height:1.4}
+.step{margin:0 0 16px}
+.step h3{margin:0 0 8px;font-size:16px;color:#cfd5de;font-weight:700}
+.step .hint{font-size:14px;color:var(--muted);margin-top:6px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+input[type=range]{width:100%;accent-color:var(--teal)}
+.big{width:100%;padding:16px;font-size:21px;margin-top:6px}
+#navVal{font-weight:800;color:var(--teal)}
+/* Cards */
+.overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,12,15,.55)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:34px 40px;max-width:720px;text-align:center}
+.card .k{font-size:18px;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
+.card .v{font-size:64px;font-weight:800;margin:6px 0 4px;font-variant-numeric:tabular-nums}
+.card .d{font-size:19px;color:var(--muted);margin-bottom:24px}
+.card .row{justify-content:center}
+/* Results */
+#results{position:fixed;inset:0;background:var(--bg);overflow:auto;padding:36px 48px}
+#results h1{font-size:40px;margin:0 0 4px}
+#results .lead{color:var(--muted);font-size:18px;margin:0 0 26px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-bottom:22px}
+.m{background:#1b1f26;border:1px solid var(--line);border-radius:16px;padding:20px 22px}
+.m .name{font-size:17px;color:var(--muted);margin-bottom:12px}
+.m .pair{display:flex;align-items:baseline;gap:12px;font-variant-numeric:tabular-nums;flex-wrap:wrap}
+.m .from{font-size:24px;color:#ff8f92;font-weight:700}
+.m .arrow{color:var(--muted);font-size:22px}
+.m .to{font-size:34px;color:var(--green);font-weight:800}
+.m .chg{margin-top:10px;font-size:22px;font-weight:800}
+.m .chg.good{color:var(--green)} .m .chg.bad{color:var(--red)} .m .chg.flat{color:var(--muted)}
+.m .lbl{font-size:13px;color:#7f8896;margin-top:2px}
+.world{background:#17201c;border:1px solid #264034;border-radius:16px;padding:20px 24px;margin-bottom:16px}
+.world h2{margin:0 0 12px;font-size:22px}
+.world ul{margin:0;padding-left:20px;font-size:18px;line-height:1.6}
+.world .src{font-size:14px;color:#8fa79b}
+.small{font-size:14px;color:#7f8896;margin:6px 0 20px}
+#toast{position:fixed;left:50%;bottom:70px;transform:translateX(-50%);background:#2a1d1f;border:1px solid #6b2f33;color:#ffd7d8;padding:12px 18px;border-radius:12px;font-size:16px;opacity:0;transition:opacity .25s;pointer-events:none}
+#toast.show{opacity:1}
+
+.sessionbar{position:fixed;right:18px;bottom:66px;display:flex;gap:7px;z-index:4;background:var(--panel);padding:8px;border:1px solid var(--line);border-radius:12px}.sessionbar a,.sessionbar button{font-size:13px;padding:9px 12px;color:var(--text);text-decoration:none;display:inline-block;border:1px solid var(--line);border-radius:8px;background:#1f242c}button:focus-visible,a:focus-visible{outline:3px solid #fff;outline-offset:3px}#note{bottom:4px}#setup{max-height:calc(100dvh - 140px)}.inspect #setup,.inspect #hud,.inspect #legend,.inspect #note{display:none!important}.inspect #ctrl{opacity:.25}.inspect #ctrl:hover{opacity:1}.inspect .sessionbar{opacity:.3}.inspect .sessionbar:hover{opacity:1}@media(max-width:1100px){#hud{gap:8px;right:18px;flex-wrap:wrap;max-width:70vw}.badge .title{font-size:23px}.badge .sub{font-size:12px;max-width:320px}.stats b{font-size:21px}.stats{gap:16px}.stats span{font-size:11px}}@media(max-width:640px){#setup{width:calc(100vw - 28px);left:14px;top:14px;padding:16px;max-height:65dvh}#hud{top:10px;left:10px;right:10px;max-width:none;gap:5px}.badge{padding:8px}.badge .num{width:28px;height:28px;font-size:16px}.badge .title{font-size:19px}.badge .sub{max-width:240px;font-size:10px}.stats{padding:8px;gap:12px}.stats b{font-size:19px}.stats span{font-size:9px}#ctrl{top:auto;bottom:120px;left:10px;right:auto}#ctrl button{font-size:12px;padding:6px}.sessionbar{left:10px;right:10px;bottom:67px;justify-content:center;flex-wrap:wrap}.sessionbar a,.sessionbar button{font-size:11px;padding:7px}#legend{font-size:10px;gap:8px;left:10px;bottom:22px;max-width:calc(100vw - 20px)}#note{font-size:9px;right:10px}#results{padding:22px 15px 130px}.card{padding:25px 18px;max-width:94vw}.card .v{font-size:42px}}
+#followInset{position:fixed;right:18px;bottom:133px;width:390px;height:265px;border:1px solid #506777;border-radius:13px;background:#161d25;overflow:hidden;pointer-events:none}#followInset strong{display:block;font-size:10px;letter-spacing:1.5px;padding:10px 13px;color:#c4dadf}#followCanvas{width:100%;height:230px;cursor:default}@media(max-width:640px){#followInset{width:250px;height:180px;bottom:180px}#followCanvas{height:146px}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas><aside id="followInset" class="hidden"><strong>AMBULANSI YAKINDAN İZLE</strong><canvas id="followCanvas" aria-label="Ambulansın çevresinin büyütülmüş görünümü"></canvas></aside>
+
+<div id="setup">
+  <h1>Ambulansın yolunu aç</h1>
+  <p class="lead">Önce bugünkü hâli, sonra sistemle hâlini izleyeceksin. Aynı trafik, aynı ambulans, aynı park etmiş araçlar.</p>
+  <div class="step">
+    <h3>1. Ne yapmak istiyorsun?</h3>
+    <div class="row"><button id="mAmb" class="on">Ambulansı yerleştir</button><button id="mPark">Park ekle / kaldır</button></div>
+    <div class="hint" id="modeHint">Haritada bir yola tıkla. Ambulans o şeridin yönünde gider.</div>
+  </div>
+  <div class="step">
+    <h3>2. Navigasyonu açık sürücüler: <span id="navVal">%40</span></h3>
+    <input id="nav" type="range" min="0" max="100" step="10" value="40">
+    <div class="hint">Sistemle ekranında bu sürücüler sesli uyarı alır. Geri kalanlar yalnızca ışıklara uyar.</div>
+  </div>
+  <div class="step"><h3>3. Yol yapısı</h3><div class="row"><button id="roadWide" class="on">İki şerit / yön</button><button id="roadNarrow">Tek şerit / yön</button></div><div class="hint" id="roadHint">Koridor için iki şeridin birlikte hareket etmesi gerekir.</div></div>
+  <div class="step">
+    <h3>4. Trafik</h3>
+    <div class="row"><button id="dNormal">Normal</button><button id="dAksam" class="on">Akşam saati</button><button id="dSeed" title="Aynı ayarlarla farklı araçlar">Farklı trafik</button></div>
+    <div class="hint">Şu anki trafik yoğunluğu: <b id="congNow">%–</b> (hız, boş yol hızına göre ne kadar düşmüş)</div>
+  </div>
+  <button id="start" class="primary big">Başlat ▶</button>
+</div>
+
+<div id="hud" class="hidden">
+  <div class="badge"><div class="num" id="pNum">1</div><div><div class="title" id="pTitle">BUGÜN</div><div class="sub" id="pSub"></div></div></div>
+  <div class="stats">
+    <div><b id="sTime">00:00</b><span>ambulansın süresi</span></div>
+    <div><b id="sSpeed">0</b><span>km/sa şu an</span></div>
+    <div><b id="sChaos">0</b><span>kaos anı</span></div>
+    <div><b id="sCong">%0</b><span>trafik yoğunluğu</span></div>
+  </div>
+</div>
+<div id="ctrl" class="hidden">
+  <button data-sp="1">1×</button><button data-sp="3" class="on">3×</button><button data-sp="6">6×</button><button id="pause">❚❚</button><button id="back" title="Ayarlara dön">Ayarlar</button>
+</div>
+<div id="legend"></div>
+<div id="note">Oyun sayıları gösterim içindir, gerçek ölçüm değildir.</div>
+
+<div id="card" class="overlay hidden"><div class="card">
+  <div class="k" id="cK">Bugün</div>
+  <div class="v" id="cV">00:00</div>
+  <div class="d" id="cD"></div>
+  <div class="row"><button id="cAgain">Tekrar izle</button><button id="cNext" class="primary">Sistemle izle ▶</button></div>
+</div></div>
+
+<div id="results" class="hidden">
+  <h1>Sonuç: aynı trafik, iki farklı gün</h1>
+  <p class="lead" id="rLead"></p>
+  <div class="grid" id="rGrid"></div>
+  <div class="world"><h2>Bu sonuç ne anlatıyor?</h2><p>Rakamlar bu modelin varsayımlarından hesaplanır. Sürücülerin tepki süreleri, yol verme davranışı ve uyarı etkisi sahada kalibre edilmemiştir. Kaza olasılığı veya kurtarılan hayat sayısı hesaplanmaz.</p><p>Tek şeritli yolda yan koridor oluşmaz: ambulans öndeki kuyruğun çözülmesini bekler. Uyarı fiziksel alan yaratmaz.</p></div><p class="small">Araştırma kaynakları PROJE_NOTLARI.md dosyasındadır; buradaki gösterim bağımsız saha kanıtı değildir. Kötü senaryolar ayrı olay canlandırmalarıdır.</p>
+  <div class="row"><button id="rAgain" class="primary">Tekrar oyna</button><button id="rSetup">Ayarları değiştir</button></div>
+</div>
+<div id="toast"></div><nav class="sessionbar" aria-label="Sunum sayfaları"><a href="senaryolar.html">Kötü senaryolar ↗</a><a href="navigasyon.html">Navigasyon ↗</a><button id="follow">Yakın takip</button><button id="focusMap">Sade görünüm</button><button id="fullScreen">⛶ Tam ekran</button></nav>
+
+<script>
+(() => {
+'use strict';
+/* ================= Yardımcılar ================= */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function expo(r,rate){return -Math.log(1-r())/rate}
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+function fmt(t){t=Math.max(0,Math.round(t));const m=Math.floor(t/60),s=t%60;return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')}
+
+/* ================= Şehir geometrisi (metre) ================= */
+const W=560,H=340,XS=[190,370],YS=[110,230],RW=7,OFF_IN=1.75,OFF_CURB=5.25,OFF_CORR=3.5,CAR_W=1.9;
+const DEST={rd:'H0+',s:520};
+const DT=0.1, WARM=360, MAXT=1800;
+const DENS={normal:{H:520,V:170,fill:0.3,exit:false},aksam:{H:1500,V:460,fill:0.95,exit:true}};
+const EXIT_C=40,EXIT_G=17; // harita dışındaki (görünmeyen) kavşaklar: çıkışlar da tıkalı // araç/saat/şerit
+const G_H=50,G_V=12,T_Y=3,T_AR=2; // dikey yollar ~60 sn kırmızı / ~10 sn yeşil
+const WARN_D=220, SIREN_D=35, PANIC_P=0.35; // siren: kapalı camlı araçta ~35 m
+const AMB_V=16, AMB_CORR_V=8.5, AMB_LEN=6.5;
+const A=1.4,B=2.0,S0=2.0,TH=1.2;
+const COLORS=['#8f99a8','#c3c8cf','#5b6a7e','#3e5878','#7d4b4b','#6c6f75','#b5ae98','#4d6c60','#93836a'];
+
+const inters=[];
+for(let j=0;j<2;j++)for(let i=0;i<2;i++)inters.push({n:inters.length,i,j,x:XS[i],y:YS[j],cross:{H:[],V:[]}});
+const interAt=(i,j)=>inters.find(t=>t.i===i&&t.j===j);
+const lanes=[],rds={},rdList=[];
+for(const axis of['H','V'])for(let r=0;r<2;r++)for(const dir of[1,-1]){
+  const key=axis+r+(dir>0?'+':'-'),L=axis==='H'?W:H;
+  const rd={key,axis,r,dir,L,lanes:[],inters:[]};
+  for(let k=0;k<2;k++){
+    const it=axis==='H'?interAt(k,r):interAt(r,k);
+    const c=axis==='H'?XS[k]:YS[k];
+    const sC=dir>0?c:L-c;
+    rd.inters.push({it,sC,sStop:sC-RW-1.5,rd});
+  }
+  rd.inters.sort((a,b)=>a.sC-b.sC);
+  for(const e of rd.inters)e.it.cross[axis].push(e);
+  for(const idx of[0,1]){const lane={id:lanes.length,rd,idx,off:idx===0?OFF_CURB:OFF_IN};lanes.push(lane);rd.lanes.push(lane)}
+  rds[key]=rd;rdList.push(rd);
+}
+function pos(rd,s,off){
+  if(rd.axis==='H'){const x=rd.dir>0?s:W-s;return[x,YS[rd.r]+rd.dir*off,rd.dir>0?0:Math.PI]}
+  const y=rd.dir>0?s:H-s;return[XS[rd.r]-rd.dir*off,y,rd.dir>0?Math.PI/2:-Math.PI/2];
+}
+
+/* ================= Rota ================= */
+function findRoute(rdKey,s){
+  let best=null,bestC=Infinity;
+  (function dfs(key,s0,legs,cost,depth){
+    const rd=rds[key];
+    if(key===DEST.rd&&DEST.s>s0+1){const c=cost+DEST.s-s0;if(c<bestC){bestC=c;best=[...legs,{rd:key,sStart:s0,sEnd:DEST.s,turn:null}]}}
+    if(depth>=3)return;
+    for(const e of rd.inters){
+      if(e.sC<s0+12)continue;
+      const other=rd.axis==='H'?'V':'H';
+      for(const ce of e.it.cross[other])dfs(ce.rd.key,ce.sC,[...legs,{rd:key,sStart:s0,sEnd:e.sC,turn:e.it}],cost+e.sC-s0+15,depth+1);
+    }
+  })(rdKey,s,[],0,0);
+  return best;
+}
+
+/* ================= Sinyaller ================= */
+function light(sg,axis){if(sg.phase!==axis)return'R';return sg.stage==='G'?'G':sg.stage==='Y'?'Y':'R'}
+function stepSignal(sg,occ){
+  sg.t+=DT;
+  if(sg.stage==='G'){
+    const g=sg.phase==='H'?G_H:G_V;
+    if(sg.preempt){if(sg.preempt!==sg.phase){sg.stage='Y';sg.t=0}}
+    else if(sg.t>=g){sg.stage='Y';sg.t=0}
+  }else if(sg.stage==='Y'){
+    if(sg.t>=T_Y){sg.stage='AR';sg.t=0}
+  }else if(sg.t>=T_AR){
+    const next=sg.preempt?sg.preempt:(sg.phase==='H'?'V':'H');const other=next==='H'?'V':'H';if(occ&&occ[other]>0)return;sg.phase=next;sg.stage='G';sg.t=0;
+  }
+}
+
+/* ================= Dünya ================= */
+function makeWorld(cfg){
+  const w={cfg,mode:cfg.mode,t:0,veh:[],amb:null,chaos:0,nextId:1,sig:[],ls:[],items:lanes.map(()=>[]),occ:inters.map(()=>({H:0,V:0})),m:{othersV:0,othersN:0,warned:0}};
+  inters.forEach((it,n)=>w.sig.push({n,phase:'H',stage:'G',t:[0,16,31,47][n],preempt:null}));
+  const d=DENS[cfg.density];
+  for(const l of lanes){const rng=mulberry32((cfg.seed*7919+l.id*104729+13)>>>0);const rate=cfg.singleLane&&l.idx===0?0:(l.rd.axis==='H'?d.H:d.V)/3600;w.ls[l.id]={rng,rate,next:expo(rng,rate),pending:[]}}
+  w.parked=cfg.parked.map(p=>({lane:rds[p.rd].lanes[0],s:p.s,len:4.6,v:0,parked:true}));
+  // başlangıçta tüm yolları araçla doldur (boş şehirden başlamasın)
+  for(const l of lanes){
+    if(cfg.singleLane&&l.idx===0)continue;
+    const r=mulberry32((cfg.seed*15485863+l.id*7907+5)>>>0);let s=l.rd.L-2;
+    while(s>6){
+      const big=r()<0.08,len=big?7.5:4.4,vDes=11+4*r(),color=COLORS[Math.floor(r()*COLORS.length)],navU=r(),panicU=r(),react=0.8+2.2*r(),put=r()<d.fill;
+      const inBox=l.rd.inters.some(e=>s>e.sC-RW-2&&s-len<e.sC+RW+2);
+      const onPark=l.idx===0&&w.parked.some(p=>p.lane===l&&s>p.s-p.len-2&&s-len<p.s+2);
+      if(put&&!inBox&&!onPark)w.veh.push({id:w.nextId++,lane:l,s,v:0,len,big,vDes,color,nav:navU<cfg.navFrac,panicU,react,lat:0,latTarget:0,state:'normal',awareT:-1,reacted:false,warned:false,crossT:-1,crossStop:false,crossBub:false,conf:-1,bubble:null,lcCool:0,_k:0,creepE:null,panicT:0});
+      s-=len+2.2+r()*1.2;
+    }
+  }
+  return w;
+}
+function spawnStep(w){
+  for(const l of lanes){
+    if(w.cfg.singleLane&&l.idx===0)continue;
+    const st=w.ls[l.id],r=st.rng;
+    while(st.next<=w.t){
+      const big=r()<0.08,vDes=11+4*r(),color=COLORS[Math.floor(r()*COLORS.length)],navU=r(),panicU=r(),react=0.8+2.2*r();
+      if(st.pending.length<40)st.pending.push({len:big?7.5:4.4,big,vDes,color,navU,panicU,react});
+      st.next+=expo(r,st.rate);
+    }
+    if(!st.pending.length)continue;
+    const items=w.items[l.id],first=items[0]||null,p=st.pending[0];
+    if(first&&(first.s-first.len)<p.len+3)continue;
+    st.pending.shift();
+    const v0=first?Math.min(p.vDes,first.v+1):p.vDes*0.9;
+    const veh={id:w.nextId++,lane:l,s:p.len,v:v0,len:p.len,big:p.big,vDes:p.vDes,color:p.color,nav:p.navU<w.cfg.navFrac,panicU:p.panicU,react:p.react,lat:0,latTarget:0,state:'normal',awareT:-1,reacted:false,warned:false,crossT:-1,crossStop:false,crossBub:false,conf:-1,bubble:null,lcCool:0,_k:0,creepE:null,panicT:0};
+    w.veh.push(veh);items.unshift(veh);
+  }
+}
+function buildLanes(w){
+  for(const l of lanes)w.items[l.id].length=0;
+  for(const v of w.veh)w.items[v.lane.id].push(v);
+  for(const p of w.parked)w.items[p.lane.id].push(p);
+  const a=w.amb;
+  if(a&&!a.done){const rd=rds[a.legs[a.legIdx].rd];a.item.s=a.s;a.item.v=a.v;for(const ln of rd.lanes)w.items[ln.id].push(a.item)}
+  for(const l of lanes){const arr=w.items[l.id];arr.sort((p,q)=>p.s-q.s);for(let k=0;k<arr.length;k++){const it=arr[k];if(!it.parked&&!it.isAmb)it._k=k}}
+}
+function computeOcc(w){
+  for(const o of w.occ){o.H=0;o.V=0}
+  const add=(rd,s,len)=>{for(const e of rd.inters)if(s>e.sC-RW&&s-len<e.sC+RW)w.occ[e.it.n][rd.axis]++};
+  for(const v of w.veh)add(v.lane.rd,v.s,v.len);
+  const a=w.amb;if(a&&!a.done)add(rds[a.legs[a.legIdx].rd],a.s,a.len);
+}
+function idm(v,v0,gap,dv){v0=Math.max(v0,0.5);const ss=S0+Math.max(0,v*TH+v*dv/(2*Math.sqrt(A*B)));return A*(1-Math.pow(v/v0,4)-Math.pow(ss/Math.max(gap,0.1),2))}
+function freeAcc(v,v0){v0=Math.max(v0,0.5);return A*(1-Math.pow(v/v0,4))}
+function bubble(v,text,color){v.bubble={text,color,t:2.6}}
+function fullyYielded(it){return !it.singleLane&&it.state==='yield'&&((it.lane.idx===1&&it.lat<=-1.0)||(it.lane.idx===0&&it.lat>=1.0))}
+function setYieldLat(w,v){
+  if(w.cfg.singleLane){v.singleLane=true;v.partial=true;v.latTarget=0;return}
+  // kuyrukta sıkışmış, organize olmayan sürücü ancak biraz kıpırdayabilir; uyarı alan / hareket eden tam çekilir
+  const free=v.warned||v.cue||v.squeezed||v.v>2,amt=free?1.3:0.55;v.partial=!free;
+  if(v.lane.idx===1){v.latTarget=-amt;return}
+  const blocked=w.parked.some(p=>p.lane===v.lane&&p.s>v.s-v.len-1&&p.s-p.len<v.s+1);
+  v.latTarget=blocked?0:amt;
+}
+function ambXY(w){const a=w.amb;return pos(rds[a.legs[a.legIdx].rd],a.s-a.len/2,w.cfg.singleLane?OFF_IN:OFF_CORR)}
+function routeDist(w,v){
+  const a=w.amb;if(!a||a.done)return null;
+  const key=v.lane.rd.key;let acc=0;
+  for(let k=a.legIdx;k<a.legs.length;k++){
+    const leg=a.legs[k],from=k===a.legIdx?a.s:leg.sStart;
+    if(leg.rd===key){
+      const rear=v.s-v.len,minS=k===a.legIdx?from-a.len-3:from;
+      if(v.s>=minS&&rear<=leg.sEnd+4)return acc+(rear-from);
+    }
+    acc+=leg.sEnd-from;
+  }
+  return null;
+}
+function nextEntryAhead(v){for(const e of v.lane.rd.inters)if(v.s<e.sC-RW+0.3)return e;return null}
+function queuedAtRed(w,v){
+  const e=nextEntryAhead(v);if(!e)return null;
+  if(light(w.sig[e.it.n],v.lane.rd.axis)==='G')return null;
+  const dStop=e.sStop-v.s;if(dStop<-0.5||dStop>30||v.v>1.5)return null;
+  let rank=0;const items=w.items[v.lane.id];
+  for(let m=v._k+1;m<items.length;m++){const it=items[m];if(it.s>e.sStop+0.5)break;if(!it.parked&&!it.isAmb)rank++}
+  return{e,rank};
+}
+function react(w,v){
+  if(v.cue){v.state='yield';setYieldLat(w,v);return}
+  const q=queuedAtRed(w,v);
+  if(w.mode==='bugun'&&q&&q.rank<2){v.state='creep';v.creepE=q.e;bubble(v,'!','#f5b942');w.chaos++;return}
+  const calm=w.mode==='sistem'&&v.nav;
+  if(!calm&&v.panicU<PANIC_P){v.state='panic';v.panicT=3.0;bubble(v,'!','#ff5a5f');w.chaos++;return}
+  v.state='yield';setYieldLat(w,v);
+}
+function crossCheck(w,v){
+  const a=w.amb;const axisA=rds[a.legs[a.legIdx].rd].axis;
+  if(v.lane.rd.axis===axisA){v.crossStop=false;v.crossT=-1;return}
+  const e=nextEntryAhead(v);
+  if(!e){v.crossStop=false;v.crossT=-1;return}
+  const[ax,ay]=ambXY(w),it=e.it;
+  const near=Math.hypot(ax-it.x,ay-it.y)<22&&(e.sStop-v.s)<40; // ambulans kavşağa gelmeden yeşildekiler fark etmez
+  if(near){if(v.crossT<0&&!v.crossStop)v.crossT=v.react}
+  else{v.crossStop=false;v.crossT=-1;return}
+  if(v.crossT>=0){v.crossT-=DT;if(v.crossT<=0){v.crossT=-1;v.crossStop=true;if(!v.crossBub&&w.mode==='bugun'){v.crossBub=true;bubble(v,'?','#f5b942')}}}
+}
+function awareness(w){
+  const a=w.amb&&!w.amb.done?w.amb:null;
+  for(const v of w.veh){
+    if(v.bubble){v.bubble.t-=DT;if(v.bubble.t<=0)v.bubble=null}
+    if(!a){if(v.state==='yield'||v.state==='panic'){v.state='normal';v.latTarget=0}v.crossStop=false;continue}
+    const d=routeDist(w,v);
+    if(d!==null){
+      if(w.mode==='sistem'&&v.nav&&d>0&&d<WARN_D&&!v.warned){
+        v.warned=true;v.reacted=true;w.m.warned++;
+        if(v.state==='normal'||v.state==='panic'){v.state='yield';setYieldLat(w,v)}
+      }
+      if(!v.reacted&&v.awareT<0&&d<SIREN_D)v.awareT=v.react;
+      if(!v.reacted&&v.awareT<0&&d<120&&w.mode==='sistem'){const ld=w.items[v.lane.id][v._k+1];if(ld&&ld.warned&&ld.state==='yield'){v.cue=true;v.awareT=v.react*0.6}}
+      v.ambD=d;
+      if(!v.reacted&&v.awareT>=0){v.awareT-=DT;if(v.awareT<=0){v.reacted=true;react(w,v)}}
+      if(v.reacted&&v.state==='normal'&&d<60){v.state='yield';setYieldLat(w,v)}
+    }else{v.ambD=null;if(v.state==='yield'||v.state==='panic'){v.state='normal';v.latTarget=0}}
+    if(v.state==='yield'&&v.partial){
+      if(v.v>2)setYieldLat(w,v);
+      else if(d!==null&&d<15){v.sqT=(v.sqT||0)+DT;if(v.sqT>4+2*v.react){v.squeezed=true;setYieldLat(w,v)}} // ambulans arkasında bekleyince sonunda sıkışıp yer açar
+    }
+    if(v.state==='panic'){v.panicT-=DT;if(v.panicT<=0){v.state='yield';setYieldLat(w,v)}}
+    if(v.state==='creep'&&(v.s>v.creepE.sC+RW+1||v.lane.rd!==v.creepE.rd)){
+      if(d!==null){v.state='yield';setYieldLat(w,v)}else{v.state='normal';v.latTarget=0}
+    }
+    crossCheck(w,v);
+  }
+}
+function exitBlocked(w,v,lead,e){
+  if(!lead||lead.isAmb)return false;
+  if(lead.s<=e.sStop)return false;
+  return(lead.s-lead.len)-(e.sC+RW)<v.len+2&&lead.v<5;
+}
+function dynamics(w){
+  for(const v of w.veh){
+    const rd=v.lane.rd,items=w.items[v.lane.id];
+    let lead=null;
+    for(let m=v._k+1;m<items.length;m++){const it=items[m];if(it.isAmb&&(v.state==='yield'||v.state==='panic'))continue;lead=it;break}
+    let v0=v.vDes;if(v.state==='yield'&&v.ambD!==null&&v.ambD<40)v0=2.5;if(v.state==='creep')v0=3.5;
+    let acc;
+    if(v.state==='panic')acc=-5;
+    else{
+      acc=lead?idm(v.v,v0,(lead.s-lead.len)-v.s,v.v-lead.v):freeAcc(v.v,v0);
+      // fermuar: sağ şeritte park yüzünden bekleyen aracın önüne geçme, yer aç
+      if(v.lane.idx===1){
+        for(const c of w.items[rd.lanes[0].id]){
+          if(!c.wantMerge)continue;const cr=c.s-c.len-v.s;
+          if(cr>0&&cr<12){acc=Math.min(acc,idm(v.v,v0,cr,v.v-c.v));break}
+        }
+      }
+      const e=nextEntryAhead(v);
+      if(e){
+        const n=e.it.n,lt=light(w.sig[n],rd.axis),dStop=e.sStop-v.s;
+        const before=dStop>-0.3,stopPt=before?e.sStop:e.sC-RW-0.3;
+        if(v.state!=='creep'){
+          let stop=false;
+          if(before&&lt==='R')stop=true;
+          else if(before&&lt==='Y'&&dStop>v.v*v.v/6+0.5)stop=true;
+          if(exitBlocked(w,v,lead,e))stop=true;
+          if(before&&v.crossStop)stop=true;
+          if(stop)acc=Math.min(acc,idm(v.v,v0,Math.max(stopPt-v.s,0.1),v.v));
+        }
+        const other=rd.axis==='H'?'V':'H';
+        if(w.occ[n][other]>0){
+          const dist=(e.sC-RW-0.8)-v.s;
+          if(dist<40){const a2=idm(v.v,v0,Math.max(dist,0.1),v.v);
+            if(a2<acc){if(a2<-2&&lt==='G'&&v.state==='normal'&&v.conf!==n){v.conf=n;bubble(v,'?!','#f5b942');w.chaos++}acc=a2}}
+        }
+      }
+    }
+    if(DENS[w.cfg.density].exit&&v.state!=='panic'){
+      const L=rd.L,dE=(L-1)-v.s;
+      if(dE>-0.5&&dE<60&&((w.t+v.lane.id*7.3)%EXIT_C)>EXIT_G)acc=Math.min(acc,idm(v.v,v0,Math.max(dE,0.1),v.v));
+    }
+    acc=Math.max(acc,-9);
+    let nv=Math.max(0,v.v+acc*DT),ns=v.s+(v.v+nv)/2*DT;
+    if(lead){const lim=lead.s-lead.len-0.3;if(ns>lim){ns=Math.max(v.s,lim);nv=Math.min(nv,lead.v)}}
+    v._nv=nv;v._ns=ns;
+  }
+  const a=w.amb&&!w.amb.done;
+  for(const v of w.veh){
+    v.v=v._nv;v.s=v._ns;
+    const ls=(v.warned||v.state==='normal')?1.4:0.7,dl=v.latTarget-v.lat;v.lat+=clamp(dl,-ls*DT,ls*DT);
+    if(a){w.m.othersV+=v.v;w.m.othersN++}
+  }
+  if(a&&Math.round(w.t*10)%10===0){w.m.congS+=congestion(w);w.m.congN++}
+}
+function crossApproaching(w,n,other){
+  for(const ce of inters[n].cross[other])for(const ln of ce.rd.lanes)for(const it of w.items[ln.id]){
+    if(it.isAmb||it.parked)continue;
+    if(it.s>=ce.sStop-12&&it.s<ce.sC-RW+0.5&&it.v>2&&!it.crossStop)return true;
+  }
+  return false;
+}
+function computePreempt(w){
+  for(const s of w.sig)s.preempt=null;
+  const a=w.amb;let acc=0,cnt=0;
+  for(let k=a.legIdx;k<a.legs.length;k++){
+    const leg=a.legs[k],rd=rds[leg.rd],from=k===a.legIdx?a.s:leg.sStart;
+    for(const e of rd.inters){
+      if(e.sC>leg.sEnd+0.5)continue;
+      if(e.sStop<from-0.5)continue;
+      const D=acc+(e.sStop-from);
+      cnt++;
+      if((cnt===1&&D<280)||(cnt===2&&D<100))if(!w.sig[e.it.n].preempt)w.sig[e.it.n].preempt=rd.axis;
+    }
+    acc+=leg.sEnd-from;
+  }
+}
+function stepAmb(w){
+  const a=w.amb,leg=a.legs[a.legIdx],rd=rds[leg.rd];
+  let v0=AMB_V,lead=null,gapL=1e9,along=false,hesitant=false;
+  for(const ln of rd.lanes)for(const it of w.items[ln.id]){
+    if(it.isAmb||it.parked)continue;
+    if(it.s<a.s-a.len-1)continue;
+    const rear=it.s-it.len,fy=fullyYielded(it);
+    if(rear>a.s-0.5){if(fy){if(rear-a.s<12){along=true;if(!it.warned)hesitant=true}continue}const g=rear-a.s;if(g<gapL){gapL=g;lead=it}}
+    else if(fy){along=true;if(!it.warned)hesitant=true}
+  }
+  if(along)v0=hesitant?5.5:AMB_CORR_V;
+  let acc=lead?idm(a.v,v0,gapL,a.v-lead.v):freeAcc(a.v,v0);
+  const other=rd.axis==='H'?'V':'H';
+  for(const e of rd.inters){
+    if(e.sC>leg.sEnd+0.5||e.sStop<a.s-0.5)continue;
+    const n=e.it.n,lt=light(w.sig[n],rd.axis),dStop=e.sStop-a.s,busy=w.occ[n][other]>0;
+    if(lt!=='G'){
+      const ok=!busy&&!crossApproaching(w,n,other);
+      if(!ok)acc=Math.min(acc,idm(a.v,v0,Math.max(dStop,0.1),a.v));
+      else if(dStop<25)acc=Math.min(acc,freeAcc(a.v,5));
+    }else if(busy)acc=Math.min(acc,idm(a.v,v0,Math.max(dStop,0.1),a.v));
+    break;
+  }
+  if(leg.turn&&leg.sEnd-a.s<28)acc=Math.min(acc,freeAcc(a.v,6));
+  acc=Math.max(acc,-7);
+  let nv=Math.max(0,a.v+acc*DT),ns=a.s+(a.v+nv)/2*DT;
+  if(lead){const lim=lead.s-lead.len-0.4;if(ns>lim){ns=Math.max(a.s,lim);nv=Math.min(nv,lead.v)}}
+  a.dist+=ns-a.s;a.s=ns;a.v=nv;a.t+=DT;if(nv<1)a.waitT+=DT;if(nv<2.78)a.slowT+=DT;
+  if(a.s>=leg.sEnd){
+    if(a.legIdx===a.legs.length-1)a.done=true;
+    else{const over=a.s-leg.sEnd;a.legIdx++;a.s=a.legs[a.legIdx].sStart+over}
+  }
+}
+function laneChanges(w){
+  if(w.cfg.singleLane)return;
+  for(const v of w.veh){
+    v.wantMerge=false;
+    if(v.lcCool>0){v.lcCool-=DT;continue}
+    if(v.lane.idx!==0)continue;
+    if(v.state==='panic')continue;
+    const items=w.items[v.lane.id],lead=items[v._k+1];
+    if(!lead||!lead.parked)continue;
+    const gp=(lead.s-lead.len)-v.s;
+    if(gp>45)continue;
+    const waiting=gp<15&&v.v<1;v.wantMerge=waiting;
+    const inner=v.lane.rd.lanes[1],it2=w.items[inner.id];
+    let ahead=null,behind=null;for(const o of it2){if(o.s>v.s){ahead=o;break}behind=o}
+    const okA=!ahead||(ahead.s-ahead.len)-v.s>=(waiting?0.6:2.5+0.3*v.v);
+    const okB=!behind||(v.s-v.len)-behind.s>=(waiting?((behind.v||0)<1?0.3:1.5):2.5+0.6*(behind.v||0));
+    if(okA&&okB){v.lane=inner;v.lat+=3.5;v.latTarget=0;v.lcCool=3;v.wantMerge=false;if(v.state==='yield')setYieldLat(w,v)}
+  }
+}
+function step(w){
+  w.t+=DT;
+  if(w.amb&&!w.amb.done&&w.mode==='sistem')computePreempt(w);else for(const s of w.sig)s.preempt=null;
+  computeOcc(w);for(const s of w.sig)stepSignal(s,w.occ[s.n]);
+  spawnStep(w);buildLanes(w);computeOcc(w);awareness(w);dynamics(w);
+  if(w.amb&&!w.amb.done){buildLanes(w);computeOcc(w);stepAmb(w)}
+  laneChanges(w);
+  w.veh=w.veh.filter(v=>v.s-v.len<v.lane.rd.L+2);
+}
+function warmup(w,secs){const n=Math.round(secs/DT);for(let i=0;i<n;i++)step(w)}
+function spawnAmb(w){
+  const c=w.cfg.amb,legs=findRoute(c.rd,c.s);if(!legs)return false;
+  const rd=rds[c.rd];
+  w.veh=w.veh.filter(v=>!(v.lane.rd===rd&&v.s>c.s-AMB_LEN-3&&v.s-v.len<c.s+3));
+  w.amb={legs,legIdx:0,s:c.s,v:6,len:AMB_LEN,t:0,waitT:0,slowT:0,dist:0,done:false,routeLen:legs.reduce((s,l)=>s+l.sEnd-l.sStart,0),item:{isAmb:true,s:c.s,len:AMB_LEN,v:6}};
+  w.chaos=0;w.m={othersV:0,othersN:0,warned:0,congS:0,congN:0};
+  return true;
+}
+function congestion(w){if(!w.veh.length)return 0;let sv=0,sd=0;for(const v of w.veh){sv+=v.v;sd+=v.vDes}return Math.round(clamp(1-sv/sd,0,1)*100)}
+function metricsOf(w){
+  const a=w.amb;
+  return{time:a.t,done:a.done,avgKmh:a.t>0?a.dist/a.t*3.6:0,wait:a.waitT,slow:a.slowT,chaos:w.chaos,othersKmh:w.m.othersN?w.m.othersV/w.m.othersN*3.6:0,cong:w.m.congN?Math.round(w.m.congS/w.m.congN):0,warned:w.m.warned,routeLen:a.routeLen};
+}
+function simulate(cfg){
+  const w=makeWorld(cfg);warmup(w,WARM);
+  if(!spawnAmb(w))return null;
+  while(!w.amb.done&&w.amb.t<MAXT)step(w);
+  return metricsOf(w);
+}
+
+/* ================= Varsayılanlar ================= */
+const DEFAULT_PARKED=[
+  {rd:'V0-',s:138},{rd:'V0-',s:143.2},{rd:'V0-',s:186},{rd:'V0-',s:206},
+  {rd:'H0+',s:240},{rd:'H0+',s:245.2},{rd:'H0+',s:310},
+  {rd:'H1-',s:280},{rd:'H1+',s:95},{rd:'V1+',s:170},{rd:'V1-',s:60},
+  {rd:'H0-',s:120},{rd:'H0-',s:125.2},{rd:'H0-',s:300},{rd:'H1+',s:260},{rd:'V0+',s:160},{rd:'H1-',s:450}
+];
+const cfg={singleLane:false,seed:7,density:'aksam',navFrac:0.4,parked:DEFAULT_PARKED.map(p=>({...p})),amb:{rd:'V0-',s:45}};
+
+/* ================= Çizim ================= */
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+let view={sc:1,ox:0,oy:0},dpr=1,city=null;
+function resize(){
+  dpr=window.devicePixelRatio||1;
+  canvas.width=Math.round(innerWidth*dpr);canvas.height=Math.round(innerHeight*dpr);
+  const sc=Math.min(innerWidth/W,innerHeight/H);
+  view={sc,ox:(innerWidth-W*sc)/2,oy:(innerHeight-H*sc)/2};
+  city=renderCity();
+}
+function renderCity(){
+  const oc=document.createElement('canvas');oc.width=canvas.width;oc.height=canvas.height;
+  const g=oc.getContext('2d');
+  g.setTransform(dpr,0,0,dpr,0,0);g.fillStyle='#111418';g.fillRect(0,0,innerWidth,innerHeight);
+  g.translate(view.ox,view.oy);g.scale(view.sc,view.sc);
+  g.fillStyle='#1a1e24';g.fillRect(0,0,W,H);
+  const cols=[[0,XS[0]-RW-2],[XS[0]+RW+2,XS[1]-RW-2],[XS[1]+RW+2,W]],rows=[[0,YS[0]-RW-2],[YS[0]+RW+2,YS[1]-RW-2],[YS[1]+RW+2,H]];
+  const rr=mulberry32(99);
+  for(let ci=0;ci<3;ci++)for(let ri=0;ri<3;ri++){
+    const[x0,x1]=cols[ci],[y0,y1]=rows[ri];
+    if(ci===2&&ri===1)continue; // hastane
+    if(ci===1&&ri===2){g.fillStyle='#1b2a21';g.fillRect(x0+4,y0+4,x1-x0-8,y1-y0-8);
+      g.fillStyle='#22382b';for(let k=0;k<14;k++){g.beginPath();g.arc(x0+12+rr()*(x1-x0-24),y0+12+rr()*(y1-y0-24),3+rr()*4,0,7);g.fill()}continue}
+    const nx=Math.max(1,Math.round((x1-x0)/48)),ny=Math.max(1,Math.round((y1-y0)/46));
+    const bw=(x1-x0-8)/nx,bh=(y1-y0-8)/ny;
+    for(let a=0;a<nx;a++)for(let b=0;b<ny;b++){
+      const sh=0.85+rr()*0.15;g.fillStyle=`rgb(${Math.round(36*sh)},${Math.round(41*sh)},${Math.round(50*sh)})`;
+      g.fillRect(x0+4+a*bw+1.5,y0+4+b*bh+1.5,bw-3,bh-3);
+    }
+  }
+  // hastane
+  const hx0=cols[2][0],hy0=rows[1][0],hx1=cols[2][1],hy1=rows[1][1];
+  g.fillStyle='#1f2a33';g.fillRect(hx0+4,hy0+4,hx1-hx0-8,hy1-hy0-8);
+  g.fillStyle='#dfe6ee';g.fillRect(410,128,130,62);
+  g.fillStyle='#e63946';g.fillRect(468,140,14,38);g.fillRect(456,152,38,14);
+  g.fillStyle='#3a414c';g.fillRect(512,117,14,11);
+  // yollar
+  const roadR=(x,y,w2,h2,c)=>{g.fillStyle=c;g.fillRect(x,y,w2,h2)};
+  for(const y of YS)roadR(0,y-RW-2,W,2*RW+4,'#2b3038');
+  for(const x of XS)roadR(x-RW-2,0,2*RW+4,H,'#2b3038');
+  for(const y of YS)roadR(0,y-RW,W,2*RW,'#353b44');
+  for(const x of XS)roadR(x-RW,0,2*RW,H,'#353b44');
+  // çizgiler
+  const inBox=(p,arr)=>arr.some(c=>Math.abs(p-c)<RW+0.5);
+  g.lineWidth=0.25;
+  for(const y of YS){
+    for(const off of[-0.25,0.25]){g.strokeStyle='#cfa743';g.beginPath();let on=false;for(let x=0;x<=W;x+=1){const ib=inBox(x,XS);if(!ib&&!on){g.moveTo(x,y+off);on=true}else if(ib&&on){g.lineTo(x,y+off);on=false}}if(on)g.lineTo(W,y+off);g.stroke()}
+    g.strokeStyle='rgba(225,229,235,.45)';
+    for(const off of[-3.5,3.5]){for(let x=0;x<W;x+=6){if(inBox(x,XS)||inBox(x+3,XS))continue;g.beginPath();g.moveTo(x,y+off);g.lineTo(x+3,y+off);g.stroke()}}
+  }
+  for(const x of XS){
+    for(const off of[-0.25,0.25]){g.strokeStyle='#cfa743';g.beginPath();let on=false;for(let y=0;y<=H;y+=1){const ib=inBox(y,YS);if(!ib&&!on){g.moveTo(x+off,y);on=true}else if(ib&&on){g.lineTo(x+off,y);on=false}}if(on)g.lineTo(x+off,H);g.stroke()}
+    g.strokeStyle='rgba(225,229,235,.45)';
+    for(const off of[-3.5,3.5]){for(let y=0;y<H;y+=6){if(inBox(y,YS)||inBox(y+3,YS))continue;g.beginPath();g.moveTo(x+off,y);g.lineTo(x+off,y+3);g.stroke()}}
+  }
+  // Tek şerit modelinde dış şeritler fiziksel olarak kullanılamaz.
+  if(cfg.singleLane){g.fillStyle='#242a31';for(const y of YS){g.fillRect(0,y-RW,W,3.5);g.fillRect(0,y+3.5,W,3.5)}for(const x of XS){g.fillRect(x-RW,0,3.5,H);g.fillRect(x+3.5,0,3.5,H)}g.strokeStyle='#9c845e';g.lineWidth=.3;for(const y of YS)for(let x=0;x<W;x+=6){g.beginPath();g.moveTo(x,y+3.8);g.lineTo(x+2,y+6.5);g.stroke()}for(const x of XS)for(let y=0;y<H;y+=6){g.beginPath();g.moveTo(x+3.8,y);g.lineTo(x+6.5,y+2);g.stroke()}}
+  // dur çizgileri
+  g.strokeStyle='rgba(240,242,245,.8)';g.lineWidth=0.5;
+  for(const rd of rdList)for(const e of rd.inters){const[x1,y1]=pos(rd,e.sStop,0.3),[x2,y2]=pos(rd,e.sStop,RW-0.3);g.beginPath();g.moveTo(x1,y1);g.lineTo(x2,y2);g.stroke()}
+  g.setTransform(dpr,0,0,dpr,0,0);
+  // hastane etiketi
+  const[sx,sy]=toScreen(475,128);
+  g.font='700 15px system-ui,Segoe UI,Arial';g.fillStyle='#e9eef4';g.textAlign='center';g.fillText('HASTANE',sx,sy-6);
+  return oc;
+}
+function toScreen(x,y){return[view.ox+x*view.sc,view.oy+y*view.sc]}
+function toWorld(px,py){return[(px-view.ox)/view.sc,(py-view.oy)/view.sc]}
+function carShape(g,len,wid,r){const x0=-len,y0=-wid/2;g.beginPath();g.moveTo(x0+r,y0);g.lineTo(-r,y0);g.quadraticCurveTo(0,y0,0,y0+r);g.lineTo(0,-y0-r);g.quadraticCurveTo(0,-y0,-r,-y0);g.lineTo(x0+r,-y0);g.quadraticCurveTo(x0,-y0,x0,-y0-r);g.lineTo(x0,y0+r);g.quadraticCurveTo(x0,y0,x0+r,y0);g.closePath()}
+function drawAmbShape(g,x,y,ang,t){
+  g.save();g.translate(x,y);g.rotate(ang);
+  const flash=Math.floor(t*4)%2===0,pr=(t*1.2)%1;
+  g.strokeStyle=`rgba(255,255,255,${0.55*(1-pr)})`;g.lineWidth=0.6;g.beginPath();g.arc(-AMB_LEN/2,0,4+10*pr,0,7);g.stroke();
+  g.fillStyle=flash?'rgba(255,70,70,.35)':'rgba(70,140,255,.35)';g.beginPath();g.arc(-AMB_LEN/2,0,7,0,7);g.fill();
+  g.scale(1.25,1.25);carShape(g,AMB_LEN,2.4,0.6);g.fillStyle='#f6f7f9';g.fill();g.strokeStyle='#ffffff';g.lineWidth=0.4;g.stroke();
+  g.fillStyle='#e63946';g.fillRect(-AMB_LEN+0.6,-0.35,AMB_LEN-1.2,0.7);
+  g.fillStyle=flash?'#ff4040':'#3b82ff';g.fillRect(-2.6,-1.1,0.8,1.1);
+  g.fillStyle=flash?'#3b82ff':'#ff4040';g.fillRect(-2.6,0,0.8,1.1);
+  g.fillStyle='#9fb6c9';g.fillRect(-1.0,-1.0,0.7,2.0);
+  g.restore();
+}
+function drawWorld(w,opts){
+  ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(city,0,0);
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.save();ctx.translate(view.ox,view.oy);ctx.scale(view.sc,view.sc);
+  const a=w&&w.amb&&!w.amb.done?w.amb:null,T=performance.now()/1000;
+  // önceliklendirilen kavşaklar
+  if(w)for(const sg of w.sig)if(sg.preempt){const it=inters[sg.n];ctx.strokeStyle='rgba(61,220,151,.85)';ctx.lineWidth=1.2;ctx.strokeRect(it.x-RW-1.5,it.y-RW-1.5,2*RW+3,2*RW+3)}
+  // rota
+  const legs=a?a.legs.slice(a.legIdx):(opts&&opts.previewLegs)||null;
+  if(legs){
+    ctx.setLineDash([3,2.5]);ctx.strokeStyle='rgba(255,140,140,.75)';ctx.lineWidth=1.2;ctx.beginPath();
+    legs.forEach((leg,k)=>{const rd=rds[leg.rd],s0=(a&&k===0)?a.s:leg.sStart;const[x0,y0]=pos(rd,s0,cfg.singleLane?OFF_IN:OFF_CORR),[x1,y1]=pos(rd,leg.sEnd,cfg.singleLane?OFF_IN:OFF_CORR);if(k===0)ctx.moveTo(x0,y0);else ctx.lineTo(x0,y0);ctx.lineTo(x1,y1)});
+    ctx.stroke();ctx.setLineDash([]);
+    if(a&&w.mode==='sistem'){
+      // uyarı menzili
+      ctx.strokeStyle='rgba(47,211,199,.22)';ctx.lineWidth=6;ctx.lineCap='round';ctx.beginPath();let left=WARN_D;
+      legs.forEach((leg,k)=>{if(left<=0)return;const rd=rds[leg.rd],s0=k===0?a.s:leg.sStart,s1=Math.min(leg.sEnd,s0+left);left-=s1-s0;const[x0,y0]=pos(rd,s0,cfg.singleLane?OFF_IN:OFF_CORR),[x1,y1]=pos(rd,s1,cfg.singleLane?OFF_IN:OFF_CORR);if(k===0)ctx.moveTo(x0,y0);else ctx.lineTo(x0,y0);ctx.lineTo(x1,y1)});
+      ctx.stroke();ctx.lineCap='butt';
+    }
+  }
+  // varış noktası
+  {const[x,y]=pos(rds[DEST.rd],DEST.s,OFF_CORR);ctx.fillStyle='#e63946';ctx.beginPath();ctx.arc(x,y,2.2,0,7);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=0.5;ctx.stroke()}
+  if(w){
+    // ışıklar
+    for(const rd of rdList)for(const e of rd.inters){
+      const lt=light(w.sig[e.it.n],rd.axis),[x,y]=pos(rd,e.sStop,RW+1.6);
+      ctx.fillStyle='#0c0e11';ctx.beginPath();ctx.arc(x,y,1.7,0,7);ctx.fill();
+      ctx.fillStyle=lt==='G'?'#3ddc97':lt==='Y'?'#f5b942':'#ff4d4f';ctx.beginPath();ctx.arc(x,y,1.25,0,7);ctx.fill();
+    }
+    // park etmiş araçlar
+    for(const p of w.parked){const[x,y,ang]=pos(p.lane.rd,p.s,p.lane.off+0.5);ctx.save();ctx.translate(x,y);ctx.rotate(ang);carShape(ctx,p.len,2.2,0.55);ctx.fillStyle='#4a505b';ctx.fill();ctx.strokeStyle='#c98b2f';ctx.lineWidth=0.35;ctx.setLineDash([0.8,0.6]);ctx.stroke();ctx.setLineDash([]);ctx.restore()}
+    // araçlar
+    for(const v of w.veh){
+      const[x,y,ang]=pos(v.lane.rd,v.s,v.lane.off+v.lat);
+      ctx.save();ctx.translate(x,y);ctx.rotate(ang);
+      carShape(ctx,v.len,v.big?2.5:2.2,0.55);ctx.fillStyle=v.color;ctx.fill();
+      let st=null;
+      if(v.warned&&v.state==='yield')st='#2fd3c7';else if(v.state==='panic')st='#ff5a5f';else if(v.state==='creep')st='#f5b942';
+      if(st){ctx.strokeStyle=st;ctx.lineWidth=0.55;ctx.stroke()}
+      ctx.fillStyle='rgba(15,18,22,.55)';ctx.fillRect(-1.6,-0.75,0.9,1.5);
+      ctx.restore();
+    }
+    if(a){
+      const[x,y,ang]=pos(rds[a.legs[a.legIdx].rd],a.s,w.cfg.singleLane?OFF_IN:OFF_CORR);
+      if(w.mode==='bugun'){const pr=0.5+0.5*Math.sin(T*6);ctx.strokeStyle=`rgba(255,90,95,${0.25+0.25*pr})`;ctx.lineWidth=0.6;ctx.setLineDash([2,2]);ctx.beginPath();ctx.arc(x,y,SIREN_D,0,7);ctx.stroke();ctx.setLineDash([])}
+      drawAmbShape(ctx,x,y,ang,T);
+    }
+  }
+  if(opts&&opts.ambMarker){const[x,y,ang]=pos(rds[opts.ambMarker.rd],opts.ambMarker.s,cfg.singleLane?OFF_IN:OFF_CORR);drawAmbShape(ctx,x,y,ang,T)}
+  ctx.restore();
+  // baloncuklar (ekran uzayı)
+  if(w){
+    ctx.setTransform(dpr,0,0,dpr,0,0);ctx.font='800 15px system-ui,Segoe UI,Arial';ctx.textAlign='center';ctx.textBaseline='middle';
+    for(const v of w.veh){
+      if(v.warned&&v.state==='yield'){const[x,y]=pos(v.lane.rd,v.s-v.len/2,v.lane.off+v.lat);const[sx,sy]=toScreen(x,y);speaker(sx,sy-14)}
+      if(!v.bubble)continue;
+      const[x,y]=pos(v.lane.rd,v.s-v.len/2,v.lane.off+v.lat);const[sx,sy]=toScreen(x,y);
+      const al=Math.min(1,v.bubble.t/0.6);ctx.globalAlpha=al;
+      const tw=ctx.measureText(v.bubble.text).width+12;
+      ctx.fillStyle=v.bubble.color;roundRect(sx-tw/2,sy-34,tw,22,6);ctx.fill();
+      ctx.beginPath();ctx.moveTo(sx-4,sy-12);ctx.lineTo(sx+4,sy-12);ctx.lineTo(sx,sy-6);ctx.fill();
+      ctx.fillStyle='#16130c';ctx.fillText(v.bubble.text,sx,sy-23);ctx.globalAlpha=1;
+    }
+  }
+}
+function roundRect(x,y,w2,h2,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w2,y,x+w2,y+h2,r);ctx.arcTo(x+w2,y+h2,x,y+h2,r);ctx.arcTo(x,y+h2,x,y,r);ctx.arcTo(x,y,x+w2,y,r);ctx.closePath()}
+function speaker(x,y){
+  ctx.fillStyle='#2fd3c7';ctx.beginPath();ctx.arc(x,y,8,0,7);ctx.fill();
+  ctx.fillStyle='#0d1a1a';ctx.fillRect(x-4,y-2,2.5,4);ctx.beginPath();ctx.moveTo(x-1.5,y-2);ctx.lineTo(x+1.5,y-4.5);ctx.lineTo(x+1.5,y+4.5);ctx.lineTo(x-1.5,y+2);ctx.closePath();ctx.fill();
+  ctx.strokeStyle='#0d1a1a';ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(x+2,y,4,-0.8,0.8);ctx.stroke();
+}
+
+/* ================= Arayüz akışı ================= */
+const $=id=>document.getElementById(id);
+let followEnabled=false;
+let ui='setup',mode='bugun',world=null,preview=null,speed=3,paused=false,acc=0,last=performance.now(),editMode='amb',results={bugun:null,sistem:null};
+function legendFor(m){
+  const items=[['#f6f7f9','Ambulans'],['#4a505b','Park etmiş araç',true]];
+  let h=items.map(([c,t,dash])=>`<span class="it"><i style="background:${c};${dash?'outline:1px dashed #c98b2f':''}"></i>${t}</span>`).join('');
+  if(m==='bugun')h+=`<span class="it"><i class="tag" style="background:#f5b942;color:#16130c">?!</i>Habersiz sürücü şaşırıyor</span><span class="it"><i class="tag" style="background:#ff5a5f;color:#16130c">!</i>Panik / kırmızıda ilerleme</span>`;
+  if(m==='sistem')h+=`<span class="it"><i style="background:#2fd3c7;border-radius:50%;width:14px;height:14px"></i>Sesli uyarı alıp kenara çeken sürücü</span><span class="it"><i style="background:transparent;outline:2px solid #3ddc97"></i>Ambulansa yeşil veren kavşak</span>`;
+  if(m==='setup')h+=`<span class="it"><i style="background:#e63946;border-radius:50%;width:12px;height:12px"></i>Hastane girişi</span>`;
+  $('legend').innerHTML=h;
+}
+function updateLens(w){const panel=$('followInset');const a=w&&w.amb;const visible=followEnabled&&ui==='run'&&a&&!a.done;panel.classList.toggle('hidden',!visible);if(!visible)return;const lc=$('followCanvas'),g=lc.getContext('2d');lc.width=780;lc.height=460;const[x,y]=ambXY(w),[sx,sy]=toScreen(x,y);const sw=Math.min(canvas.width,175*dpr),sh=Math.min(canvas.height,105*dpr),px=clamp(sx*dpr-sw/2,0,canvas.width-sw),py=clamp(sy*dpr-sh*.65,0,canvas.height-sh);g.drawImage(canvas,px,py,sw,sh,0,0,780,460)}
+$('follow').onclick=()=>{followEnabled=!followEnabled;$('follow').textContent=followEnabled?'Yakın takibi kapat':'Yakın takip';updateLens(world)};
+function newPreview(){preview=makeWorld({...cfg,mode:'bugun'});warmup(preview,240)}
+function showSetup(){
+  ui='setup';$('followInset').classList.add('hidden');$('setup').classList.remove('hidden');$('hud').classList.add('hidden');$('ctrl').classList.add('hidden');
+  $('card').classList.add('hidden');$('results').classList.add('hidden');legendFor('setup');newPreview();
+}
+function startRun(m){
+  mode=m;world=makeWorld({...cfg,mode:m});warmup(world,WARM);
+  if(!spawnAmb(world)){toast('Bu noktadan hastaneye yol yok. Ambulansı başka bir yere koy.');showSetup();return}
+  ui='run';paused=false;acc=0;
+  $('setup').classList.add('hidden');$('card').classList.add('hidden');$('results').classList.add('hidden');
+  $('hud').classList.remove('hidden');$('ctrl').classList.remove('hidden');$('pause').textContent='❚❚';
+  const b=m==='bugun';
+  $('pNum').textContent=b?'1':'2';$('pNum').style.background=b?'#ff5a5f':'#3ddc97';$('pNum').style.color='#14171c';
+  $('pTitle').textContent=b?'BUGÜN':'SİSTEMLE';$('pTitle').style.color=b?'#ff8f92':'#3ddc97';
+  $('pSub').textContent=b?'Sabit ışıklar, habersiz sürücüler, park etmiş araçlar.':'Sürücüler sesli uyarıyla kenara çekiyor, ışıklar önceden açılıyor.';
+  legendFor(m);
+}
+function endRun(){
+  const r=metricsOf(world);results[mode]=r;ui='card';
+  const b=mode==='bugun';
+  $('cK').textContent=(b?'Bugün':'Sistemle')+' · hastaneye varış';
+  $('cV').textContent=r.done?fmt(r.time):'Ulaşamadı';$('cV').style.color=b?'#ff8f92':'#3ddc97';
+  $('cD').textContent=`Ortalama hız ${Math.round(r.avgKmh)} km/sa · 10 km/sa altında geçen süre ${fmt(r.slow)} · Kaos anı ${r.chaos}`;
+  $('cNext').textContent=b?'Sistemle izle ▶':'Sonuçları gör ▶';
+  $('card').classList.remove('hidden');
+}
+function pct(a,b){return a>0?(b-a)/a*100:0}
+function showResults(){
+  ui='results';const A1=results.bugun,B1=results.sistem;
+  $('results').classList.remove('hidden');$('hud').classList.add('hidden');$('ctrl').classList.add('hidden');$('card').classList.add('hidden');
+  $('rLead').textContent=`Ambulans ${Math.round(A1.routeLen)} metrelik yolu iki kez gitti. Trafik, park etmiş araçlar ve ambulansın yeri ikisinde de aynıydı. Navigasyonu açık sürücü oranı: %${Math.round(cfg.navFrac*100)}. Ortalama trafik yoğunluğu: %${A1.cong} / %${B1.cong}.`;
+  const rows=[
+    {name:'Hastaneye varış süresi',a:A1.done?fmt(A1.time):'Ulaşamadı',b:B1.done?fmt(B1.time):'Ulaşamadı',p:A1.done&&B1.done?pct(A1.time,B1.time):NaN,goodDown:true},
+    {name:'Ambulansın ortalama hızı',a:Math.round(A1.avgKmh)+' km/sa',b:Math.round(B1.avgKmh)+' km/sa',p:pct(A1.avgKmh,B1.avgKmh),goodDown:false},
+    {name:'Ambulansın 10 km/sa altında geçirdiği süre',a:fmt(A1.slow),b:fmt(B1.slow),p:pct(A1.slow,B1.slow),goodDown:true},
+    {name:'Kaos anı (şaşkın fren, panik, kırmızıda ilerleme)',a:A1.chaos,b:B1.chaos,p:pct(A1.chaos,B1.chaos),goodDown:true},
+    {name:'Diğer araçların ortalama hızı (her koşunun kendi süresi)',a:Math.round(A1.othersKmh)+' km/sa',b:Math.round(B1.othersKmh)+' km/sa',p:pct(A1.othersKmh,B1.othersKmh),goodDown:false},
+  ];
+  $('rGrid').innerHTML=rows.map(r=>{
+    const p=Math.round(r.p),good=r.goodDown?p<0:p>0,cls=Math.abs(p)<2?'flat':good?'good':'bad',arrow=p<0?'▼':'▲';
+    return`<div class="m"><div class="name">${r.name}</div><div class="pair"><span class="from">${r.a}</span><span class="arrow">→</span><span class="to">${r.b}</span></div><div class="chg ${cls}">${!Number.isFinite(p)?'Varış tamamlanmadı':Math.abs(p)<2?'≈ aynı':arrow+' %'+Math.abs(p)}</div><div class="lbl">Bugün → Sistemle</div></div>`}).join('');
+}
+function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(()=>e.classList.remove('show'),3200)}
+
+/* ---- Haritaya tıklama ---- */
+function nearestLane(x,y,curbOnly){
+  let best=null,bd=4.2;
+  for(const l of lanes){
+    if(curbOnly&&l.idx!==0)continue;
+    const rd=l.rd;let d,s;
+    if(rd.axis==='H'){const ly=YS[rd.r]+rd.dir*l.off;d=Math.abs(y-ly);s=rd.dir>0?x:W-x}
+    else{const lx=XS[rd.r]-rd.dir*l.off;d=Math.abs(x-lx);s=rd.dir>0?y:H-y}
+    if(s<0||s>rd.L)continue;if(d<bd){bd=d;best={lane:l,s}}
+  }
+  if(!curbOnly&&!best){ // ambulans için koridora da tıklanabilir
+    for(const rd of rdList){let d,s;
+      if(rd.axis==='H'){d=Math.abs(y-(YS[rd.r]+rd.dir*OFF_CORR));s=rd.dir>0?x:W-x}else{d=Math.abs(x-(XS[rd.r]-rd.dir*OFF_CORR));s=rd.dir>0?y:H-y}
+      if(d<bd&&s>=0&&s<=rd.L){bd=d;best={lane:rd.lanes[1],s}}}
+  }
+  return best;
+}
+canvas.addEventListener('click',ev=>{
+  if(ui!=='setup')return;
+  const[x,y]=toWorld(ev.clientX,ev.clientY);
+  if(editMode==='amb'){
+    const h=nearestLane(x,y,false);if(!h){toast('Bir yolun üstüne tıkla.');return}
+    const rd=h.lane.rd;let s=clamp(h.s+AMB_LEN/2,AMB_LEN+2,rd.L-5);
+    if(rd.inters.some(e=>Math.abs(s-e.sC)<RW+6)){toast('Kavşağın tam içine koyma, biraz uzağa tıkla.');return}
+    if(!findRoute(rd.key,s)){toast('Bu şeritten hastaneye yol yok (yön önemli). Başka bir yere koy.');return}
+    cfg.amb={rd:rd.key,s};
+  }else{
+    const h=nearestLane(x,y,true);if(!h){toast('Kaldırım tarafındaki şeride tıkla.');return}
+    const rd=h.lane.rd,s=h.s+2.3;
+    const ex=cfg.parked.findIndex(p=>p.rd===rd.key&&Math.abs(p.s-s)<3.5);
+    if(ex>=0)cfg.parked.splice(ex,1);
+    else{
+      if(rd.inters.some(e=>Math.abs(s-e.sC)<RW+5)){toast('Kavşağa park edilemiyor.');return}
+      if(cfg.parked.some(p=>p.rd===rd.key&&Math.abs(p.s-s)<5)){toast('Orada zaten araç var.');return}
+      cfg.parked.push({rd:rd.key,s});
+    }
+    newPreview();
+  }
+});
+function setEdit(m){editMode=m;$('mAmb').classList.toggle('on',m==='amb');$('mPark').classList.toggle('on',m==='park');
+  $('modeHint').textContent=m==='amb'?'Haritada bir yola tıkla. Ambulans o şeridin yönünde gider.':'Kaldırım tarafındaki şeride tıkla: park etmiş araç eklenir. Var olana tıklarsan kaldırılır.'}
+async function enterFull(){try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen();else await document.exitFullscreen()}catch{toast('Tarayıcı tam ekranı açamadı. F11 tuşunu kullanabilirsin.')}}
+$('fullScreen').onclick=enterFull;
+$('focusMap').onclick=()=>{document.body.classList.toggle('inspect');$('focusMap').textContent=document.body.classList.contains('inspect')?'Kontrolleri göster':'Sade görünüm'};
+function chooseRoad(narrow){cfg.singleLane=narrow;$('roadNarrow').classList.toggle('on',narrow);$('roadWide').classList.toggle('on',!narrow);$('roadHint').textContent=narrow?'Her yönde tek şerit: kenara çekilecek alan yok. Ambulans kuyruğu takip eder.':'Koridor için iki şeridin birlikte hareket etmesi gerekir.';resize();newPreview()}
+$('roadWide').onclick=()=>chooseRoad(false);$('roadNarrow').onclick=()=>chooseRoad(true);
+addEventListener('keydown',e=>{if(e.code==='KeyF'&&!['INPUT','BUTTON'].includes(e.target.tagName))enterFull()});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&ui==='run'){paused=true;$('pause').textContent='▶'}});
+$('mAmb').onclick=()=>setEdit('amb');$('mPark').onclick=()=>setEdit('park');
+$('nav').oninput=e=>{cfg.navFrac=e.target.value/100;$('navVal').textContent='%'+e.target.value};
+$('dNormal').onclick=()=>{cfg.density='normal';$('dNormal').classList.add('on');$('dAksam').classList.remove('on');newPreview()};
+$('dAksam').onclick=()=>{cfg.density='aksam';$('dAksam').classList.add('on');$('dNormal').classList.remove('on');newPreview()};
+$('dSeed').onclick=()=>{cfg.seed=(cfg.seed*31+17)%100000;newPreview();toast('Farklı araçlarla yeni trafik.')};
+$('start').onclick=()=>{results={bugun:null,sistem:null};prep(()=>startRun('bugun'))};
+function prep(fn){toast('Trafik hazırlanıyor…');setTimeout(fn,60)}
+document.querySelectorAll('#ctrl [data-sp]').forEach(b=>b.onclick=()=>{speed=+b.dataset.sp;document.querySelectorAll('#ctrl [data-sp]').forEach(x=>x.classList.toggle('on',x===b))});
+$('pause').onclick=()=>{paused=!paused;$('pause').textContent=paused?'▶':'❚❚'};
+$('back').onclick=showSetup;
+$('cAgain').onclick=()=>prep(()=>startRun(mode));
+$('cNext').onclick=()=>{if(mode==='bugun')prep(()=>startRun('sistem'));else showResults()};
+$('rAgain').onclick=()=>{results={bugun:null,sistem:null};prep(()=>startRun('bugun'))};
+$('rSetup').onclick=showSetup;
+addEventListener('keydown',e=>{if(e.code==='Space'&&ui==='run'){e.preventDefault();$('pause').click()}if(e.code==='Enter'&&ui==='card')$('cNext').click()});
+addEventListener('resize',resize);
+
+function frame(now){
+  const dt=Math.min(0.1,(now-last)/1000);last=now;
+  if(ui==='setup'&&preview){acc+=dt;while(acc>=DT){step(preview);acc-=DT}
+    if(Math.round(preview.t*10)%10===0)$('congNow').textContent='%'+congestion(preview);
+    drawWorld(preview,{previewLegs:findRoute(cfg.amb.rd,cfg.amb.s),ambMarker:cfg.amb})}
+  else if(world){
+    if(ui==='run'&&!paused){acc+=dt*speed;let n=0;while(acc>=DT&&n<200){step(world);acc-=DT;n++;if(world.amb.done||world.amb.t>=MAXT)break}
+      const a=world.amb;$('sTime').textContent=fmt(a.t);$('sSpeed').textContent=Math.round(a.v*3.6);$('sChaos').textContent=world.chaos;if(Math.round(world.t*10)%10===0)$('sCong').textContent='%'+congestion(world);
+      if(a.done||a.t>=MAXT)endRun()}
+    drawWorld(world,{});updateLens(world);
+  }
+  requestAnimationFrame(frame);
+}
+window.SIM={_:{makeWorld,step,warmup,spawnAmb,metricsOf,inters,lanes,rds,light,fullyYielded,setYieldLat,stepSignal},simulate,cfg,DEFAULT_PARKED,findRoute,startRun,showResults,getWorld:()=>world,getResults:()=>results,setSpeed:s=>speed=s};
+resize();showSetup();requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
