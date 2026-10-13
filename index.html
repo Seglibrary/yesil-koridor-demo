@@ -74,6 +74,23 @@ input[type=range]{width:100%;accent-color:var(--teal)}
 
 .sessionbar{position:fixed;right:18px;bottom:66px;display:flex;gap:7px;z-index:4;background:var(--panel);padding:8px;border:1px solid var(--line);border-radius:12px}.sessionbar a,.sessionbar button{font-size:13px;padding:9px 12px;color:var(--text);text-decoration:none;display:inline-block;border:1px solid var(--line);border-radius:8px;background:#1f242c}button:focus-visible,a:focus-visible{outline:3px solid #fff;outline-offset:3px}#note{bottom:4px}#setup{max-height:calc(100dvh - 140px)}.inspect #setup,.inspect #hud,.inspect #legend,.inspect #note{display:none!important}.inspect #ctrl{opacity:.25}.inspect #ctrl:hover{opacity:1}.inspect .sessionbar{opacity:.3}.inspect .sessionbar:hover{opacity:1}@media(max-width:1100px){#hud{gap:8px;right:18px;flex-wrap:wrap;max-width:70vw}.badge .title{font-size:23px}.badge .sub{font-size:12px;max-width:320px}.stats b{font-size:21px}.stats{gap:16px}.stats span{font-size:11px}}@media(max-width:640px){#setup{width:calc(100vw - 28px);left:14px;top:14px;padding:16px;max-height:65dvh}#hud{top:10px;left:10px;right:10px;max-width:none;gap:5px}.badge{padding:8px}.badge .num{width:28px;height:28px;font-size:16px}.badge .title{font-size:19px}.badge .sub{max-width:240px;font-size:10px}.stats{padding:8px;gap:12px}.stats b{font-size:19px}.stats span{font-size:9px}#ctrl{top:auto;bottom:120px;left:10px;right:auto}#ctrl button{font-size:12px;padding:6px}.sessionbar{left:10px;right:10px;bottom:67px;justify-content:center;flex-wrap:wrap}.sessionbar a,.sessionbar button{font-size:11px;padding:7px}#legend{font-size:10px;gap:8px;left:10px;bottom:22px;max-width:calc(100vw - 20px)}#note{font-size:9px;right:10px}#results{padding:22px 15px 130px}.card{padding:25px 18px;max-width:94vw}.card .v{font-size:42px}}
 #followInset{position:fixed;right:18px;bottom:133px;width:390px;height:265px;border:1px solid #506777;border-radius:13px;background:#161d25;overflow:hidden;pointer-events:none}#followInset strong{display:block;font-size:10px;letter-spacing:1.5px;padding:10px 13px;color:#c4dadf}#followCanvas{width:100%;height:230px;cursor:default}@media(max-width:640px){#followInset{width:250px;height:180px;bottom:180px}#followCanvas{height:146px}}
+
+@media(max-width:699px){
+#setup{top:auto;bottom:0;left:0;right:0;width:100%;max-height:46dvh;background:#12151a;border-radius:16px 16px 0 0;padding:14px 16px 18px;z-index:6}
+#setup h1{font-size:22px}#setup p.lead{font-size:14px;margin-bottom:12px}.step{margin-bottom:12px}.step h3{font-size:15px}.step .hint{font-size:12px}
+#setup button{font-size:15px;padding:9px 12px}#setup .big{padding:13px;font-size:18px}
+#hud{top:8px;left:8px;right:8px;max-width:none;flex-direction:column;gap:6px}
+.badge{padding:8px 12px;gap:10px}.badge .num{width:28px;height:28px;font-size:16px}.badge .title{font-size:19px}.badge .sub{font-size:11px;max-width:none}
+.stats{padding:8px 12px;gap:10px;justify-content:space-between}.stats b{font-size:20px}.stats span{font-size:10px}
+#legend{left:8px;right:8px;bottom:116px;max-width:none;flex-wrap:nowrap;overflow-x:auto;font-size:11px;gap:12px;padding:7px 10px;white-space:nowrap}
+#ctrl{top:auto;left:8px;right:8px;bottom:60px;justify-content:space-between;padding:6px;gap:6px}
+#ctrl button{flex:1;font-size:14px;padding:8px 4px;min-height:40px}
+.sessionbar{left:8px;right:8px;bottom:8px;flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start}
+.sessionbar a,.sessionbar button{font-size:12px;padding:9px 10px;white-space:nowrap;flex:none}
+#note{display:none}
+#followInset{width:170px;height:122px;right:8px;bottom:auto;top:140px}#followCanvas{height:96px}
+#toast{bottom:auto;top:50%;max-width:90vw;text-align:center}
+}
 </style>
 </head>
 <body>
@@ -516,19 +533,34 @@ const cfg={singleLane:false,seed:7,density:'aksam',navFrac:0.4,parked:DEFAULT_PA
 
 /* ================= Çizim ================= */
 const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
-let view={sc:1,ox:0,oy:0},dpr=1,city=null;
+let view={sc:1,ox:0,oy:0},dpr=1,city=null,rot=false;
+const isPhone=()=>innerWidth<700;
+/* Telefonda haritayı üstteki ve alttaki panellerin arasına sığdırmak için boşlukları ölç */
+function measureInsets(){
+  if(!isPhone())return{t:0,b:innerHeight};
+  const shown=el=>el&&!el.classList.contains('hidden')&&el.getClientRects().length>0;
+  let t=8,b=innerHeight-8;
+  const hud=document.getElementById('hud');if(shown(hud))t=Math.max(t,hud.getBoundingClientRect().bottom+6);
+  for(const el of[document.getElementById('setup'),document.getElementById('legend'),document.getElementById('ctrl'),document.querySelector('.sessionbar')]){
+    if(!shown(el))continue;const r=el.getBoundingClientRect();if(r.top>innerHeight*0.3)b=Math.min(b,r.top-6);
+  }
+  return{t,b};
+}
+function applyView(g){g.translate(view.ox,view.oy);g.scale(view.sc,view.sc);if(rot){g.translate(H,0);g.rotate(Math.PI/2)}}
 function resize(){
   dpr=window.devicePixelRatio||1;
   canvas.width=Math.round(innerWidth*dpr);canvas.height=Math.round(innerHeight*dpr);
-  const sc=Math.min(innerWidth/W,innerHeight/H);
-  view={sc,ox:(innerWidth-W*sc)/2,oy:(innerHeight-H*sc)/2};
+  rot=isPhone()&&innerHeight>innerWidth;
+  const ins=measureInsets(),availH=Math.max(120,ins.b-ins.t),mw=rot?H:W,mh=rot?W:H;
+  const sc=Math.min(innerWidth/mw,availH/mh);
+  view={sc,ox:(innerWidth-mw*sc)/2,oy:ins.t+(availH-mh*sc)/2};
   city=renderCity();
 }
 function renderCity(){
   const oc=document.createElement('canvas');oc.width=canvas.width;oc.height=canvas.height;
   const g=oc.getContext('2d');
   g.setTransform(dpr,0,0,dpr,0,0);g.fillStyle='#111418';g.fillRect(0,0,innerWidth,innerHeight);
-  g.translate(view.ox,view.oy);g.scale(view.sc,view.sc);
+  applyView(g);
   g.fillStyle='#1a1e24';g.fillRect(0,0,W,H);
   const cols=[[0,XS[0]-RW-2],[XS[0]+RW+2,XS[1]-RW-2],[XS[1]+RW+2,W]],rows=[[0,YS[0]-RW-2],[YS[0]+RW+2,YS[1]-RW-2],[YS[1]+RW+2,H]];
   const rr=mulberry32(99);
@@ -576,12 +608,12 @@ function renderCity(){
   for(const rd of rdList)for(const e of rd.inters){const[x1,y1]=pos(rd,e.sStop,0.3),[x2,y2]=pos(rd,e.sStop,RW-0.3);g.beginPath();g.moveTo(x1,y1);g.lineTo(x2,y2);g.stroke()}
   g.setTransform(dpr,0,0,dpr,0,0);
   // hastane etiketi
-  const[sx,sy]=toScreen(475,128);
+  const[sx,sy]=rot?toScreen(410,159):toScreen(475,128);
   g.font='700 15px system-ui,Segoe UI,Arial';g.fillStyle='#e9eef4';g.textAlign='center';g.fillText('HASTANE',sx,sy-6);
   return oc;
 }
-function toScreen(x,y){return[view.ox+x*view.sc,view.oy+y*view.sc]}
-function toWorld(px,py){return[(px-view.ox)/view.sc,(py-view.oy)/view.sc]}
+function toScreen(x,y){return rot?[view.ox+(H-y)*view.sc,view.oy+x*view.sc]:[view.ox+x*view.sc,view.oy+y*view.sc]}
+function toWorld(px,py){return rot?[(py-view.oy)/view.sc,H-(px-view.ox)/view.sc]:[(px-view.ox)/view.sc,(py-view.oy)/view.sc]}
 function carShape(g,len,wid,r){const x0=-len,y0=-wid/2;g.beginPath();g.moveTo(x0+r,y0);g.lineTo(-r,y0);g.quadraticCurveTo(0,y0,0,y0+r);g.lineTo(0,-y0-r);g.quadraticCurveTo(0,-y0,-r,-y0);g.lineTo(x0+r,-y0);g.quadraticCurveTo(x0,-y0,x0,-y0-r);g.lineTo(x0,y0+r);g.quadraticCurveTo(x0,y0,x0+r,y0);g.closePath()}
 function drawAmbShape(g,x,y,ang,t){
   g.save();g.translate(x,y);g.rotate(ang);
@@ -597,7 +629,7 @@ function drawAmbShape(g,x,y,ang,t){
 }
 function drawWorld(w,opts){
   ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(city,0,0);
-  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.save();ctx.translate(view.ox,view.oy);ctx.scale(view.sc,view.sc);
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.save();applyView(ctx);
   const a=w&&w.amb&&!w.amb.done?w.amb:null,T=performance.now()/1000;
   // önceliklendirilen kavşaklar
   if(w)for(const sg of w.sig)if(sg.preempt){const it=inters[sg.n];ctx.strokeStyle='rgba(61,220,151,.85)';ctx.lineWidth=1.2;ctx.strokeRect(it.x-RW-1.5,it.y-RW-1.5,2*RW+3,2*RW+3)}
@@ -683,7 +715,7 @@ $('follow').onclick=()=>{followEnabled=!followEnabled;$('follow').textContent=fo
 function newPreview(){preview=makeWorld({...cfg,mode:'bugun'});warmup(preview,240)}
 function showSetup(){
   ui='setup';$('followInset').classList.add('hidden');$('setup').classList.remove('hidden');$('hud').classList.add('hidden');$('ctrl').classList.add('hidden');
-  $('card').classList.add('hidden');$('results').classList.add('hidden');legendFor('setup');newPreview();
+  $('card').classList.add('hidden');$('results').classList.add('hidden');legendFor('setup');newPreview();if(isPhone())resize();
 }
 function startRun(m){
   mode=m;world=makeWorld({...cfg,mode:m});warmup(world,WARM);
@@ -695,7 +727,7 @@ function startRun(m){
   $('pNum').textContent=b?'1':'2';$('pNum').style.background=b?'#ff5a5f':'#3ddc97';$('pNum').style.color='#14171c';
   $('pTitle').textContent=b?'BUGÜN':'SİSTEMLE';$('pTitle').style.color=b?'#ff8f92':'#3ddc97';
   $('pSub').textContent=b?'Sabit ışıklar, habersiz sürücüler, park etmiş araçlar.':'Sürücüler sesli uyarıyla kenara çekiyor, ışıklar önceden açılıyor.';
-  legendFor(m);
+  legendFor(m);if(isPhone())resize();
 }
 function endRun(){
   const r=metricsOf(world);results[mode]=r;ui='card';
